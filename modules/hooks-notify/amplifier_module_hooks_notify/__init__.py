@@ -714,6 +714,13 @@ class NotifyHooks:
         if not self.config.enabled:
             return HookResult(action="continue")
 
+        # Policy behavior: skip sub-sessions (agents, recipe steps, etc.)
+        # Notifications should only fire for root/interactive sessions
+        if data.get("parent_id"):
+            if self.config.debug:
+                logger.debug(f"Skipping notification: sub-session (parent_id={data.get('parent_id')})")
+            return HookResult(action="continue")
+
         # Check if we should suppress due to terminal being focused
         if self.config.suppress_if_focused:
             focused = is_terminal_focused()
