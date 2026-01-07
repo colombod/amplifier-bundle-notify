@@ -1,20 +1,19 @@
-# Desktop Notifications Behavior
-# Enables native desktop notifications when assistant turns complete
-
-name: desktop-notifications
-description: |
-  Adds desktop notification support for turn completion events.
-  Supports macOS, Linux, and Windows/WSL platforms.
+bundle:
+  name: behavior-desktop-notifications
+  version: 1.0.0
+  description: |
+    Desktop and terminal notifications when assistant turns complete.
+    Supports macOS, Linux, Windows/WSL, and SSH sessions.
 
 hooks:
-  - hooks-notify
-
-# Default configuration for the hooks-notify module
-config:
-  hooks:
-    notify:
+  - module: hooks-notify
+    source: git+https://github.com/microsoft/amplifier-bundle-notify@main#subdirectory=modules/hooks-notify
+    config:
       enabled: true
+      method: auto          # "auto", "terminal", or "desktop"
       title: "Amplifier"
+      subtitle: "cwd"       # "cwd", "git", or custom string
+      suppress_if_focused: true
       min_iterations: 1
       show_iteration_count: true
       sound: false
