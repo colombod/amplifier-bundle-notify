@@ -18,6 +18,7 @@ This bundle provides desktop and terminal notifications when the assistant compl
 - **Cross-platform support**: macOS, Linux, Windows/WSL
 - **SSH-aware**: Uses terminal bell sequences over SSH, desktop notifications locally
 - **Focus detection**: Optionally suppress notifications when terminal is focused
+- **Mobile push**: Optional ntfy.sh integration for mobile devices
 - **Extensible**: Emits `notify:turn-complete` event for custom notification handlers
 
 ## Quick Start
@@ -96,3 +97,23 @@ This bundle emits the `notify:turn-complete` event after sending notifications:
 ```
 
 Custom hooks can listen to this event instead of parsing `orchestrator:complete` directly.
+
+## Mobile Push Notifications
+
+For mobile devices (Termius, JuiceSSH) where terminal escape sequences don't work, use the push notifications behavior:
+
+```yaml
+includes:
+  - bundle: git+https://github.com/microsoft/amplifier-bundle-notify@main#subdirectory=behaviors/push-notifications.yaml
+```
+
+**Setup:**
+
+1. Set your ntfy.sh topic:
+   ```bash
+   export AMPLIFIER_NTFY_TOPIC="your-secret-topic"
+   ```
+
+2. Install the [ntfy app](https://ntfy.sh/) on your phone and subscribe to your topic
+
+See [modules/hooks-notify-push/README.md](modules/hooks-notify-push/README.md) for full configuration options.

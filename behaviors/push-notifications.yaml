@@ -1,0 +1,25 @@
+bundle:
+  name: behavior-push-notifications
+  version: 0.1.0
+  description: |
+    Push notifications via ntfy.sh when assistant turns complete.
+    Perfect for mobile SSH clients (Termius, JuiceSSH) where terminal
+    escape sequences don't trigger system notifications.
+
+    Requires AMPLIFIER_NTFY_TOPIC environment variable to be set.
+
+# Include desktop notifications to get the notify:turn-complete event
+includes:
+  - bundle: notify:behaviors/desktop-notifications
+
+hooks:
+  - module: hooks-notify-push
+    source: notify:modules/hooks-notify-push
+    config:
+      enabled: true
+      service: ntfy
+      # Topic from env var - set AMPLIFIER_NTFY_TOPIC
+      priority: default
+      tags:
+        - robot
+      listen_event: "notify:turn-complete"
