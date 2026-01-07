@@ -695,8 +695,9 @@ def is_terminal_focused() -> bool | None:
 class NotifyHooks:
     """Hook handlers for system notifications."""
 
-    def __init__(self, config: NotifyConfig):
+    def __init__(self, config: NotifyConfig, coordinator=None):
         self.config = config
+        self.coordinator = coordinator
         self.platform = detect_platform()
         self.is_ssh = is_ssh_session()
         # Pre-compute subtitle since it won't change during session
@@ -756,6 +757,26 @@ class NotifyHooks:
             else:
                 logger.warning(f"Notification failed via {method_used}: {error}")
 
+        # Emit semantic event for other notification hooks to consume
+        # This allows downstream hooks to listen to notify:turn-complete instead of
+        # orchestrator:complete, getting normalized data without parsing orchestrator internals
+        if self.coordinator:
+            try:
+                await self.coordinator.hooks.emit(
+                    "notify:turn-complete",
+                    {
+                        "session_id": data.get("session_id"),
+                        "turn_count": turn_count,
+                        "status": status,
+                        "project": self.subtitle,
+                        "message": message,
+                        "notification_sent": success,
+                    },
+                )
+            except Exception as e:
+                # Don't fail the hook if event emission fails
+                logger.debug(f"Failed to emit notify:turn-complete: {e}")
+
         return HookResult(action="continue")
 
 
@@ -799,7 +820,7 @@ async def mount(coordinator, config: dict | None = None):
         debug=config.get("debug", False),
     )
 
-    hooks = NotifyHooks(notify_config)
+    hooks = NotifyHooks(notify_config, coordinator=coordinator)
     platform_detected = hooks.platform
     is_ssh = hooks.is_ssh
 
