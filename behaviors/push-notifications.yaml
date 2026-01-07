@@ -14,7 +14,7 @@ includes:
 
 hooks:
   - module: hooks-notify-push
-    source: notify:modules/hooks-notify-push
+    source: git+https://github.com/microsoft/amplifier-bundle-notify@main#subdirectory=modules/hooks-notify-push
     config:
       enabled: true
       service: ntfy

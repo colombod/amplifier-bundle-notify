@@ -30,5 +30,8 @@ dev = [
     "pytest-asyncio>=0.21.0",
 ]
 
+[project.entry-points."amplifier.modules"]
+hooks-notify-push = "amplifier_module_hooks_notify_push:mount"
+
 [tool.hatch.build.targets.wheel]
 packages = ["amplifier_module_hooks_notify_push"]
