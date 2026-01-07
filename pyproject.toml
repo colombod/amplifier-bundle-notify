@@ -8,7 +8,6 @@ license = { text = "MIT" }
 authors = [{ name = "Microsoft", email = "amplifier@microsoft.com" }]
 dependencies = [
     "amplifier-core>=0.1.0",
-    "amplifier-module-hooks-notify>=0.1.0",
 ]
 
 [project.entry-points."amplifier.bundles"]
