@@ -55,6 +55,27 @@ hooks:
       sound: false
 ```
 
+## Disabling Notifications
+
+**Environment variable** (easiest):
+```bash
+AMPLIFIER_NOTIFY=false amplifier run "..."
+```
+
+**Settings override** (`~/.amplifier/settings.yaml`):
+```yaml
+hooks:
+  - module: hooks-notify
+    config:
+      enabled: false
+```
+
+**Profile exclusion**:
+```yaml
+exclude:
+  hooks: [hooks-notify]
+```
+
 ## Extending
 
 See [docs/EXTENDING.md](docs/EXTENDING.md) for guidance on creating custom notification handlers (Slack, Teams, webhooks, etc.).

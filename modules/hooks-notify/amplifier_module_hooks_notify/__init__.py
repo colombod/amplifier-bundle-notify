@@ -12,6 +12,10 @@ Terminal notifications use OSC 9/777 escape sequences that modern terminals
 like WezTerm, iTerm2, and Ghostty interpret as notification requests. This
 works transparently over SSH because the sequences are just printed to stdout.
 
+Environment Variables:
+    AMPLIFIER_NOTIFY: Set to "false", "0", "no", or "off" to disable notifications.
+                      Config `enabled` setting takes precedence over this env var.
+
 Configuration:
     enabled: bool (default: True) - Enable/disable notifications
     method: str (default: "auto") - "auto", "terminal", or "desktop"
@@ -808,8 +812,14 @@ async def mount(coordinator, config: dict | None = None):
 
     config = config or {}
 
+    # Check AMPLIFIER_NOTIFY env var for easy disable
+    # Config takes precedence over env var
+    env_notify = os.environ.get("AMPLIFIER_NOTIFY", "").lower()
+    env_enabled = env_notify not in ("false", "0", "no", "off")
+    enabled = config.get("enabled", env_enabled)
+
     notify_config = NotifyConfig(
-        enabled=config.get("enabled", True),
+        enabled=enabled,
         method=config.get("method", "auto"),
         title=config.get("title", "Amplifier"),
         subtitle=config.get("subtitle", "cwd"),

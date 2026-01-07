@@ -59,12 +59,46 @@ behaviors:
 ```yaml
 # settings.yaml or bundle config
 hooks:
-  notify:
-    enabled: true           # Enable/disable notifications
-    title: "Amplifier"      # Notification title
-    min_iterations: 2       # Only notify for multi-iteration turns
-    show_iteration_count: true
-    sound: false            # macOS only
+  - module: hooks-notify
+    config:
+      enabled: true           # Enable/disable notifications
+      method: auto            # "auto", "terminal", or "desktop"
+      title: "Amplifier"      # Notification title
+      subtitle: "cwd"         # "cwd", "git", or custom string
+      min_iterations: 1       # Only notify after N iterations
+      show_iteration_count: true
+      suppress_if_focused: true  # Skip if terminal is focused
+      sound: false            # macOS desktop only
+```
+
+### Disabling Notifications
+
+**Option 1: Environment Variable** (easiest)
+
+```bash
+# Disable for a single session
+AMPLIFIER_NOTIFY=false amplifier run "..."
+
+# Disable globally
+export AMPLIFIER_NOTIFY=false
+```
+
+**Option 2: Settings Override**
+
+```yaml
+# ~/.amplifier/settings.yaml
+hooks:
+  - module: hooks-notify
+    config:
+      enabled: false
+```
+
+**Option 3: Profile Exclusion**
+
+```yaml
+# In your bundle
+exclude:
+  hooks: [hooks-notify]
 ```
 
 ## Components
