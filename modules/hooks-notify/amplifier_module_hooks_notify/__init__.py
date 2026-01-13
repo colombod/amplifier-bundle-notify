@@ -598,19 +598,20 @@ def get_subtitle_value(config_value: str) -> str:
     
     Args:
         config_value: One of:
-            - "cwd": Use last segment of current working directory
-            - "git": Use git repo name (falls back to cwd)
+            - "cwd": Use "Project: <cwd>" as subtitle
+            - "git": Use "Project: <repo>" as subtitle (falls back to cwd)
             - Any other string: Use as literal subtitle
     
     Returns:
-        The resolved subtitle string
+        The resolved subtitle string (with "Project: " prefix for cwd/git)
     """
     if config_value == "cwd":
-        return get_cwd_name()
+        return f"Project: {get_cwd_name()}"
     elif config_value == "git":
-        return get_git_repo_name() or get_cwd_name()
+        name = get_git_repo_name() or get_cwd_name()
+        return f"Project: {name}"
     else:
-        # Custom string - use as-is
+        # Custom string - use as-is (no prefix)
         return config_value
 
 
@@ -814,26 +815,17 @@ class NotifyHooks:
                 self.coordinator, self.config.preview_length
             )
 
-        # Build message with project label on first line, content on second
-        # Format: "Project: <name>\n<preview or status>"
-        project_line = f"Project: {self.subtitle}" if self.subtitle else ""
-        
+        # Build message - just the content (project info goes in subtitle)
         if preview:
-            content_line = preview
+            message = preview
         elif self.config.show_iteration_count and turn_count > 1:
-            content_line = f"Ready ({turn_count} iterations)"
+            message = f"Ready ({turn_count} iterations)"
         else:
-            content_line = "Ready for input"
+            message = "Ready for input"
 
         # Add status if not success
         if status != "success":
-            content_line = f"{content_line} [{status}]"
-
-        # Combine into multi-line message
-        if project_line:
-            message = f"{project_line}\n{content_line}"
-        else:
-            message = content_line
+            message = f"{message} [{status}]"
 
         # Send the notification
         success, error = send_notification(
