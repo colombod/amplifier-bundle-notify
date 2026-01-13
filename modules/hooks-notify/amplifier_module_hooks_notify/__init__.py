@@ -77,6 +77,9 @@ class NotifyConfig:
     show_iteration_count: bool = True
     sound: bool = False
     debug: bool = False
+    # Message preview in notification body
+    show_preview: bool = True  # Show preview of last assistant message
+    preview_length: int = 100  # Max characters for preview
     # Events to notify on (can be extended)
     events: list[str] = field(default_factory=lambda: ["orchestrator:complete"])
 
@@ -697,6 +700,67 @@ def is_terminal_focused() -> bool | None:
     return None
 
 
+async def get_last_assistant_preview(coordinator, max_length: int = 100) -> str | None:
+    """Extract a preview of the last assistant message from context.
+
+    Args:
+        coordinator: The coordinator instance with mounted context
+        max_length: Maximum characters for the preview
+
+    Returns:
+        Preview string or None if no assistant message found
+    """
+    if not coordinator:
+        return None
+
+    try:
+        # Access the context module via coordinator
+        context = coordinator.get("context")
+        if not context:
+            return None
+
+        # Get messages from context
+        messages = await context.get_messages()
+        if not messages:
+            return None
+
+        # Find last assistant message (iterate backwards)
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant":
+                content = msg.get("content", "")
+                if not content:
+                    continue
+
+                # Handle content that might be a list (tool calls, etc.)
+                if isinstance(content, list):
+                    # Extract text from content blocks
+                    text_parts = []
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            text_parts.append(block.get("text", ""))
+                        elif isinstance(block, str):
+                            text_parts.append(block)
+                    content = " ".join(text_parts)
+
+                if not content or not isinstance(content, str):
+                    continue
+
+                # Clean up the content for notification display
+                # Remove leading/trailing whitespace and collapse internal whitespace
+                content = " ".join(content.split())
+
+                # Truncate to max_length
+                if len(content) > max_length:
+                    content = content[: max_length - 3] + "..."
+
+                return content
+
+        return None
+    except Exception as e:
+        logger.debug(f"Failed to get assistant preview: {e}")
+        return None
+
+
 class NotifyHooks:
     """Hook handlers for system notifications."""
 
@@ -743,7 +807,17 @@ class NotifyHooks:
             return HookResult(action="continue")
 
         # Build notification message
-        if self.config.show_iteration_count and turn_count > 1:
+        # Try to get a preview of the last assistant message
+        preview = None
+        if self.config.show_preview:
+            preview = await get_last_assistant_preview(
+                self.coordinator, self.config.preview_length
+            )
+
+        if preview:
+            # Use the preview as the main message content
+            message = preview
+        elif self.config.show_iteration_count and turn_count > 1:
             message = f"Ready ({turn_count} iterations)"
         else:
             message = "Ready for input"
