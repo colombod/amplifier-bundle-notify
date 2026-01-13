@@ -33,18 +33,12 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
+from amplifier_core import HookResult
+
 logger = logging.getLogger(__name__)
 
 # Track registered coordinators to prevent duplicate registration
 _registered_coordinators: set[int] = set()
-
-
-@dataclass
-class HookResult:
-    """Result from a hook handler."""
-
-    action: str = "continue"
-    message: str | None = None
 
 
 @dataclass
