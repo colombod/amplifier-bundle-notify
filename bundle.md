@@ -4,9 +4,12 @@ bundle:
   version: 0.1.0
   description: Desktop and terminal notifications when assistant turns complete
 
-# Include the desktop notifications behavior by default
-includes:
-  - bundle: notify:behaviors/desktop-notifications
+# Note: This root bundle does NOT auto-include behaviors.
+# It exists to register the "notify:" namespace for behavior files.
+# To use notifications, include the specific behavior you want:
+#   - notify:behaviors/desktop-notifications
+#   - notify:behaviors/push-notifications
+# Or configure via settings.yaml config.notifications section.
 ---
 
 # Notify Bundle
