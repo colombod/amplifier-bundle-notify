@@ -71,13 +71,15 @@ class NotifyConfig:
     enabled: bool = True
     method: str = "auto"  # "auto", "terminal", "desktop"
     title: str = "Amplifier"  # Notification title
-    subtitle: str = "cwd"  # "cwd", "git", or custom string
+    subtitle: str = "cwd"  # "cwd", "git", or custom string (for project name)
     suppress_if_focused: bool = True  # Skip if terminal appears focused
     min_iterations: int = 1
     show_iteration_count: bool = True
     sound: bool = False
     debug: bool = False
-    # Message preview in notification body
+    # Message content options
+    show_device: bool = True  # Show device/hostname in notification
+    show_project: bool = True  # Show project name in notification
     show_preview: bool = True  # Show preview of last assistant message
     preview_length: int = 100  # Max characters for preview
     # Events to notify on (can be extended)
@@ -122,43 +124,43 @@ def is_inside_tmux() -> bool:
 
 def detect_terminal_emulator() -> str | None:
     """Detect which terminal emulator we're running in.
-    
+
     Returns terminal name or None if unknown.
     """
     # TERM_PROGRAM is set by many modern terminals
     term_program = os.environ.get("TERM_PROGRAM", "").lower()
     if term_program:
         return term_program  # "wezterm", "iterm.app", "apple_terminal", etc.
-    
+
     # WezTerm also sets WEZTERM_EXECUTABLE
     if os.environ.get("WEZTERM_EXECUTABLE"):
         return "wezterm"
-    
+
     # iTerm2 sets ITERM_SESSION_ID
     if os.environ.get("ITERM_SESSION_ID"):
         return "iterm2"
-    
+
     # Ghostty sets GHOSTTY_RESOURCES_DIR
     if os.environ.get("GHOSTTY_RESOURCES_DIR"):
         return "ghostty"
-    
+
     # Check TERM for hints (less reliable)
     term = os.environ.get("TERM", "")
     if "kitty" in term:
         return "kitty"
-    
+
     return None
 
 
 def supports_osc_notifications() -> bool:
     """Check if the terminal likely supports OSC 9/777 notifications.
-    
+
     Returns True if:
     - Running in a known-supporting terminal (WezTerm, iTerm2, Ghostty, Kitty)
     - Connected via SSH (assume remote terminal can interpret OSC)
     - In WSL (likely connected to Windows terminal)
     - Inside tmux (passthrough will forward to outer terminal)
-    
+
     Note: We don't strictly require isatty() because:
     - SSH sessions have SSH_TTY set even if our stdout is piped
     - tmux sessions have TMUX set even if our stdout is piped
@@ -169,17 +171,17 @@ def supports_osc_notifications() -> bool:
     # our process's stdout is piped through amplifier
     if is_ssh_session():
         return True
-    
+
     # Inside tmux - can use passthrough to reach outer terminal
     if is_inside_tmux():
         return True
-    
+
     # Known terminals that support OSC notifications
     terminal = detect_terminal_emulator()
     supporting_terminals = {"wezterm", "iterm2", "iterm.app", "ghostty", "kitty"}
     if terminal and terminal in supporting_terminals:
         return True
-    
+
     # WSL - likely connected to Windows Terminal or similar
     try:
         with open("/proc/version") as f:
@@ -187,7 +189,7 @@ def supports_osc_notifications() -> bool:
                 return True
     except Exception:
         pass
-    
+
     # Fallback: require interactive terminal
     return is_terminal_interactive()
 
@@ -199,14 +201,14 @@ def is_inside_screen() -> bool:
 
 def wrap_for_tmux(sequence: str) -> str:
     """Wrap an escape sequence for tmux passthrough.
-    
+
     tmux intercepts escape sequences by default. To pass them through
     to the outer terminal, we wrap them in DCS (Device Control String):
-    
+
     ESC P tmux; ESC <sequence> ST
-    
+
     Where ST is ESC \\ (String Terminator)
-    
+
     Note: Requires tmux 3.3+ with allow-passthrough enabled, or tmux 3.4+
     where passthrough is on by default for new sessions.
     """
@@ -218,7 +220,7 @@ def wrap_for_tmux(sequence: str) -> str:
 
 def wrap_for_screen(sequence: str) -> str:
     """Wrap an escape sequence for GNU screen passthrough.
-    
+
     Similar to tmux, screen intercepts escape sequences.
     """
     # DCS <sequence> ST
@@ -229,9 +231,10 @@ def wrap_for_screen(sequence: str) -> str:
 # Terminal Notifications (OSC Escape Sequences)
 # =============================================================================
 
+
 def get_tty_for_output() -> tuple[str | None, str | None]:
     """Get the best file descriptor for writing OSC sequences.
-    
+
     Returns:
         Tuple of (file_path_or_None, description)
         - For tmux: /dev/tty (tmux pane's PTY, not SSH_TTY)
@@ -249,16 +252,16 @@ def get_tty_for_output() -> tuple[str | None, str | None]:
                 return "/dev/tty", "tmux pane TTY (/dev/tty)"
             except (IOError, OSError):
                 pass
-    
+
     # SSH session (no tmux) - use SSH_TTY directly to bypass piped stdout
     ssh_tty = os.environ.get("SSH_TTY")
     if ssh_tty and os.path.exists(ssh_tty):
         return ssh_tty, f"SSH TTY ({ssh_tty})"
-    
+
     # Check if stdout is a TTY
     if sys.stdout.isatty():
         return None, "stdout"  # None means use stdout
-    
+
     # Try /dev/tty as fallback (controlling terminal)
     if os.path.exists("/dev/tty"):
         try:
@@ -268,7 +271,7 @@ def get_tty_for_output() -> tuple[str | None, str | None]:
             return "/dev/tty", "controlling terminal"
         except (IOError, OSError):
             pass
-    
+
     return None, "no terminal available"
 
 
@@ -297,7 +300,7 @@ def send_terminal_notification(
         Tuple of (success, error_message)
     """
     tty_path, tty_desc = get_tty_for_output()
-    
+
     # If tty_path is None and tty_desc indicates an error, fail
     if tty_path is None and tty_desc == "no terminal available":
         return False, "No terminal available for OSC output"
@@ -325,7 +328,7 @@ def send_terminal_notification(
         # Wrap for terminal multiplexers if needed
         in_tmux = is_inside_tmux()
         in_screen = is_inside_screen()
-        
+
         if in_tmux:
             # tmux passthrough: wrap sequences so they reach the outer terminal
             osc_777 = wrap_for_tmux(osc_777)
@@ -349,7 +352,11 @@ def send_terminal_notification(
             sys.stdout.flush()
 
         multiplexer = "tmux" if in_tmux else ("screen" if in_screen else None)
-        detail = f"via {multiplexer} passthrough to {tty_desc}" if multiplexer else f"to {tty_desc}"
+        detail = (
+            f"via {multiplexer} passthrough to {tty_desc}"
+            if multiplexer
+            else f"to {tty_desc}"
+        )
         return True, detail
     except Exception as e:
         return False, str(e)
@@ -359,13 +366,17 @@ def send_terminal_notification(
 # Desktop Notifications (Native OS)
 # =============================================================================
 
+
 def _escape_quotes(text: str) -> str:
     """Escape quotes for shell commands."""
     return text.replace('"', '\\"').replace("'", "\\'")
 
 
 def send_macos_notification(
-    message: str, title: str = "Amplifier", subtitle: str | None = None, sound: bool = False
+    message: str,
+    title: str = "Amplifier",
+    subtitle: str | None = None,
+    sound: bool = False,
 ) -> tuple[bool, str | None]:
     """Send notification on macOS using osascript."""
     try:
@@ -375,7 +386,9 @@ def send_macos_notification(
         script_parts = [f'display notification "{message}" with title "{title}"']
         if subtitle:
             subtitle = _escape_quotes(subtitle)
-            script_parts[0] = f'display notification "{message}" with title "{title}" subtitle "{subtitle}"'
+            script_parts[0] = (
+                f'display notification "{message}" with title "{title}" subtitle "{subtitle}"'
+            )
         if sound:
             script_parts[0] += ' sound name "default"'
 
@@ -503,6 +516,7 @@ def send_desktop_notification(
 # Unified Notification Interface
 # =============================================================================
 
+
 def send_notification(
     message: str,
     title: str = "Amplifier",
@@ -544,21 +558,23 @@ def send_notification(
 # Hook Implementation
 # =============================================================================
 
+
 def get_cwd_name() -> str:
     """Get the last segment of the current working directory."""
     from pathlib import Path
+
     return Path.cwd().name
 
 
 def get_git_repo_name() -> str | None:
     """Get the git repository name, or None if not in a git repo.
-    
+
     Tries in order:
     1. Repo name from remote origin URL
     2. Git toplevel directory name
     """
     from pathlib import Path
-    
+
     # Try to get git repo name from remote URL
     try:
         result = subprocess.run(
@@ -576,7 +592,7 @@ def get_git_repo_name() -> str | None:
             return name
     except Exception:
         pass
-    
+
     # Try git toplevel directory name
     try:
         result = subprocess.run(
@@ -589,40 +605,82 @@ def get_git_repo_name() -> str | None:
             return Path(result.stdout.strip()).name
     except Exception:
         pass
-    
+
     return None
 
 
-def get_subtitle_value(config_value: str) -> str:
-    """Resolve the subtitle based on config value.
-    
+def get_device_name() -> str:
+    """Get short device/hostname.
+
+    Returns the short hostname (before first dot) for use in notifications.
+    """
+    import socket
+
+    try:
+        hostname = socket.gethostname()
+        # Return short name (before first dot)
+        return hostname.split(".")[0]
+    except Exception:
+        return ""
+
+
+def get_project_name(config_value: str) -> str:
+    """Resolve the project name based on config value.
+
     Args:
         config_value: One of:
-            - "cwd": Use "Project: <cwd>" as subtitle
-            - "git": Use "Project: <repo>" as subtitle (falls back to cwd)
-            - Any other string: Use as literal subtitle
-    
+            - "cwd": Use last segment of current working directory
+            - "git": Use git repo name (falls back to cwd)
+            - Any other string: Use as literal value
+
     Returns:
-        The resolved subtitle string (with "Project: " prefix for cwd/git)
+        The resolved project name string
     """
     if config_value == "cwd":
-        return f"Project: {get_cwd_name()}"
+        return get_cwd_name()
     elif config_value == "git":
-        name = get_git_repo_name() or get_cwd_name()
-        return f"Project: {name}"
+        return get_git_repo_name() or get_cwd_name()
     else:
-        # Custom string - use as-is (no prefix)
+        # Custom string - use as-is
         return config_value
+
+
+def build_notification_body(
+    device: str | None,
+    project: str | None,
+    content: str,
+) -> str:
+    """Build notification body with pipe-separated fields.
+
+    Format: <device> | <project> | <content>
+    Smart about separators - only shows fields that are populated.
+
+    Args:
+        device: Device/hostname (or None to omit)
+        project: Project name (or None to omit)
+        content: Main content (preview or status)
+
+    Returns:
+        Formatted notification body string
+    """
+    parts = []
+    if device:
+        parts.append(device)
+    if project:
+        parts.append(project)
+    parts.append(content)
+
+    return " | ".join(parts)
 
 
 def is_terminal_focused() -> bool | None:
     """Check if the terminal appears to be focused/active.
-    
+
     Returns:
         True if terminal is focused
         False if terminal is not focused
         None if focus cannot be determined (assume not focused)
-    
+
     Detection methods by environment:
     - tmux: Check if current pane is active and window is focused
     - macOS: Check if Terminal/iTerm2 is frontmost app (desktop only)
@@ -654,30 +712,41 @@ def is_terminal_focused() -> bool | None:
         except Exception:
             pass
         return None
-    
+
     # SSH session without tmux - can't determine client-side focus
     if is_ssh_session():
         return None
-    
+
     # Local macOS - check if terminal app is frontmost
     plat = detect_platform()
     if plat == Platform.MACOS:
         try:
             # Check if Terminal or iTerm2 is the frontmost application
             result = subprocess.run(
-                ["osascript", "-e", 
-                 'tell application "System Events" to get name of first application process whose frontmost is true'],
+                [
+                    "osascript",
+                    "-e",
+                    'tell application "System Events" to get name of first application process whose frontmost is true',
+                ],
                 capture_output=True,
                 text=True,
                 timeout=2,
             )
             if result.returncode == 0:
                 frontmost = result.stdout.strip().lower()
-                terminal_apps = {"terminal", "iterm2", "iterm", "wezterm", "kitty", "alacritty", "ghostty"}
+                terminal_apps = {
+                    "terminal",
+                    "iterm2",
+                    "iterm",
+                    "wezterm",
+                    "kitty",
+                    "alacritty",
+                    "ghostty",
+                }
                 return frontmost in terminal_apps
         except Exception:
             pass
-    
+
     # Linux with X11 - try xdotool
     elif plat == Platform.LINUX and os.environ.get("DISPLAY"):
         try:
@@ -691,12 +760,20 @@ def is_terminal_focused() -> bool | None:
             if result.returncode == 0:
                 window_name = result.stdout.strip().lower()
                 # Check if it looks like a terminal
-                terminal_keywords = {"terminal", "konsole", "gnome-terminal", "xterm", 
-                                    "kitty", "alacritty", "wezterm", "ghostty"}
+                terminal_keywords = {
+                    "terminal",
+                    "konsole",
+                    "gnome-terminal",
+                    "xterm",
+                    "kitty",
+                    "alacritty",
+                    "wezterm",
+                    "ghostty",
+                }
                 return any(kw in window_name for kw in terminal_keywords)
         except Exception:
             pass
-    
+
     # Cannot determine focus
     return None
 
@@ -770,8 +847,11 @@ class NotifyHooks:
         self.coordinator = coordinator
         self.platform = detect_platform()
         self.is_ssh = is_ssh_session()
-        # Pre-compute subtitle since it won't change during session
-        self.subtitle = get_subtitle_value(config.subtitle)
+        # Pre-compute device and project since they won't change during session
+        self.device_name = get_device_name() if config.show_device else None
+        self.project_name = (
+            get_project_name(config.subtitle) if config.show_project else None
+        )
 
     async def handle_orchestrator_complete(
         self, event: str, data: dict[str, Any]
@@ -784,7 +864,9 @@ class NotifyHooks:
         # Notifications should only fire for root/interactive sessions
         if data.get("parent_id"):
             if self.config.debug:
-                logger.debug(f"Skipping notification: sub-session (parent_id={data.get('parent_id')})")
+                logger.debug(
+                    f"Skipping notification: sub-session (parent_id={data.get('parent_id')})"
+                )
             return HookResult(action="continue")
 
         # Check if we should suppress due to terminal being focused
@@ -815,30 +897,43 @@ class NotifyHooks:
                 self.coordinator, self.config.preview_length
             )
 
-        # Build message - just the content (project info goes in subtitle)
+        # Build content part of message
         if preview:
-            message = preview
+            content = preview
         elif self.config.show_iteration_count and turn_count > 1:
-            message = f"Ready ({turn_count} iterations)"
+            content = f"Ready ({turn_count} iterations)"
         else:
-            message = "Ready for input"
+            content = "Ready for input"
 
         # Add status if not success
         if status != "success":
-            message = f"{message} [{status}]"
+            content = f"{content} [{status}]"
 
-        # Send the notification
+        # Build full message with pipe-separated fields: device | project | content
+        message = build_notification_body(
+            device=self.device_name,
+            project=self.project_name,
+            content=content,
+        )
+
+        # Send the notification (no subtitle - all info is in the message body now)
         success, error = send_notification(
             message=message,
             title=self.config.title,
-            subtitle=self.subtitle,
+            subtitle=None,
             sound=self.config.sound,
             method=self.config.method,
         )
 
         if self.config.debug:
-            method_used = "terminal" if (self.config.method == "terminal" or
-                (self.config.method == "auto" and self.is_ssh)) else "desktop"
+            method_used = (
+                "terminal"
+                if (
+                    self.config.method == "terminal"
+                    or (self.config.method == "auto" and self.is_ssh)
+                )
+                else "desktop"
+            )
             if success:
                 logger.debug(f"Notification sent via {method_used}: {message}")
             else:
@@ -855,7 +950,7 @@ class NotifyHooks:
                         "session_id": data.get("session_id"),
                         "turn_count": turn_count,
                         "status": status,
-                        "project": self.subtitle,
+                        "project": self.project_name,
                         "message": message,
                         "notification_sent": success,
                     },
@@ -936,7 +1031,8 @@ async def mount(coordinator, config: dict | None = None):
             "enabled": notify_config.enabled,
             "method": notify_config.method,
             "title": notify_config.title,
-            "subtitle": hooks.subtitle,  # Resolved value
+            "project_name": hooks.project_name,  # Resolved value
+            "device_name": hooks.device_name,  # Resolved value
             "suppress_if_focused": notify_config.suppress_if_focused,
             "min_iterations": notify_config.min_iterations,
         },
