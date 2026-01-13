@@ -26,16 +26,34 @@ The easiest way to configure notifications:
 # Desktop/terminal notifications
 amplifier notify desktop --enable
 
-# Push notifications via ntfy.sh
-amplifier notify ntfy --enable --topic my-secret-topic
+# Push notifications via ntfy.sh (prompts securely for topic)
+amplifier notify ntfy --enable
 
 # Check current settings
 amplifier notify status
 ```
 
-## Manual Configuration (settings.yaml)
+## Security: ntfy Topics
 
-Alternatively, configure directly in `settings.yaml`:
+> **⚠️ IMPORTANT: ntfy.sh topics are PUBLIC**
+>
+> Anyone who knows your topic name can:
+> - **Read** all your notifications
+> - **Send** messages to your topic
+>
+> For this reason, the topic is stored securely in `~/.amplifier/keys.env`,
+> NOT in settings.yaml.
+
+**Best practices:**
+- Use a unique, hard-to-guess topic name (e.g., `amplifier-yourname-x7k9m2`)
+- Never share your topic name
+- Consider self-hosting ntfy for maximum privacy
+
+The CLI will prompt you securely (input hidden) when you enable ntfy notifications.
+
+## Manual Configuration
+
+### Desktop notifications (settings.yaml)
 
 ```yaml
 # ~/.amplifier/settings.yaml
@@ -43,27 +61,34 @@ config:
   notifications:
     desktop:
       enabled: true
-      title: "Amplifier"
-      subtitle: "cwd"           # "cwd", "git", or custom string
+      show_device: true       # Include hostname
+      show_project: true      # Include project/directory
+      show_preview: true      # Include message preview
+      preview_length: 100
       suppress_if_focused: true
-      sound: false              # macOS only
-    
-    push:
-      enabled: true
-      service: ntfy
-      topic: "my-amplifier-alerts"  # Your secret topic
-      server: "https://ntfy.sh"
-      priority: default
-    
-    # Common options
-    min_iterations: 1
-    show_iteration_count: true
+      sound: false            # macOS only
 ```
 
-This approach:
-- Only fires for root sessions (not sub-agents)
-- Works with any bundle (foundation, recipes, custom)
-- Allows multiple notification methods simultaneously
+### Push notifications
+
+**Step 1:** Set your topic in keys.env (securely):
+```bash
+# ~/.amplifier/keys.env (chmod 600)
+AMPLIFIER_NTFY_TOPIC="your-secret-topic-here"
+```
+
+**Step 2:** Enable in settings.yaml (non-secret options only):
+```yaml
+# ~/.amplifier/settings.yaml
+config:
+  notifications:
+    ntfy:
+      enabled: true
+      server: "https://ntfy.sh"  # or your self-hosted server
+      priority: default          # min, low, default, high, urgent
+```
+
+Or just use `amplifier notify ntfy --enable` which handles both steps.
 
 ## Alternative: Direct Bundle Inclusion
 
@@ -93,8 +118,10 @@ includes:
 |--------|---------|-------------|
 | `enabled` | `true` | Enable/disable notifications |
 | `method` | `"auto"` | `"auto"`, `"terminal"`, or `"desktop"` |
-| `title` | `"Amplifier"` | Notification title |
-| `subtitle` | `"cwd"` | `"cwd"`, `"git"`, or custom string |
+| `show_device` | `true` | Include hostname in notification |
+| `show_project` | `true` | Include project/directory name |
+| `show_preview` | `true` | Include message preview |
+| `preview_length` | `100` | Max characters for preview |
 | `suppress_if_focused` | `true` | Skip if terminal appears focused |
 | `min_iterations` | `1` | Only notify after N iterations |
 | `show_iteration_count` | `true` | Show iteration count in message |
@@ -104,11 +131,18 @@ includes:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `enabled` | `false` | Enable/disable (requires `NTFY_TOPIC` env var if not configured) |
+| `enabled` | `false` | Enable/disable push notifications |
 | `service` | `"ntfy"` | Push service (currently only ntfy supported) |
-| `topic` | - | Your ntfy topic (treat like a password) |
 | `server` | `"https://ntfy.sh"` | ntfy server URL |
 | `priority` | `"default"` | `min`, `low`, `default`, `high`, `urgent` |
+
+**Environment Variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `AMPLIFIER_NTFY_TOPIC` | **Required.** Your ntfy topic (stored in keys.env) |
+| `AMPLIFIER_NTFY_SERVER` | Override server URL |
+| `AMPLIFIER_NOTIFY_PUSH_ENABLED` | Set to "false" to disable |
 
 ## Disabling Notifications
 

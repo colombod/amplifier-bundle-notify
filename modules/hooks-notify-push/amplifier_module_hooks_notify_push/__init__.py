@@ -9,15 +9,19 @@ or can listen directly to `orchestrator:complete` for independent operation.
 Supported Services:
 - ntfy.sh (default) - Free, open-source, no signup required
 
-Environment Variables:
-    AMPLIFIER_NTFY_TOPIC: ntfy.sh topic to publish to (required for ntfy.sh)
-    AMPLIFIER_NTFY_SERVER: ntfy.sh server URL (default: https://ntfy.sh)
-    AMPLIFIER_PUSH_ENABLED: Set to "false" to disable (default: true)
+SECURITY NOTE:
+    ntfy.sh topics are PUBLIC - anyone who knows your topic can read your
+    notifications. The topic is treated as a secret and should be stored in
+    ~/.amplifier/keys.env, NOT in settings.yaml.
 
-Configuration:
+Environment Variables:
+    AMPLIFIER_NTFY_TOPIC: ntfy.sh topic (REQUIRED - stored in keys.env)
+    AMPLIFIER_NTFY_SERVER: ntfy.sh server URL (default: https://ntfy.sh)
+    AMPLIFIER_NOTIFY_PUSH_ENABLED: Set to "false" to disable (default: true)
+
+Configuration (settings.yaml - non-secret options only):
     enabled: bool (default: True) - Enable/disable push notifications
     service: str (default: "ntfy") - Push service to use ("ntfy")
-    topic: str - ntfy.sh topic (or use AMPLIFIER_NTFY_TOPIC env var)
     server: str (default: "https://ntfy.sh") - ntfy.sh server URL
     priority: str (default: "default") - Message priority (min, low, default, high, urgent)
     tags: list[str] (default: ["robot"]) - Emoji tags for the notification
@@ -38,6 +42,7 @@ _registered_coordinators: set[int] = set()
 @dataclass
 class HookResult:
     """Result from a hook handler."""
+
     action: str = "continue"
     message: str | None = None
 
@@ -45,6 +50,7 @@ class HookResult:
 @dataclass
 class PushConfig:
     """Configuration for push notifications."""
+
     enabled: bool = True
     service: str = "ntfy"
     topic: str = ""
@@ -68,6 +74,7 @@ class PushNotifyHook:
         """Get or create aiohttp session."""
         if self._session is None or self._session.closed:
             import aiohttp
+
             self._session = aiohttp.ClientSession()
         return self._session
 
@@ -77,18 +84,20 @@ class PushNotifyHook:
             return False, "No topic configured"
 
         url = f"{self.config.server.rstrip('/')}/{self.config.topic}"
-        
+
         headers = {
             "Title": title,
             "Priority": self.config.priority,
         }
-        
+
         if self.config.tags:
             headers["Tags"] = ",".join(self.config.tags)
 
         try:
             session = await self._get_session()
-            async with session.post(url, data=message.encode(), headers=headers) as resp:
+            async with session.post(
+                url, data=message.encode(), headers=headers
+            ) as resp:
                 if resp.status == 200:
                     return True, None
                 else:
@@ -116,7 +125,7 @@ class PushNotifyHook:
             # Raw orchestrator:complete event
             turn_count = data.get("turn_count", 0)
             status = data.get("status", "unknown")
-            
+
             title = "Amplifier"
             if status == "success":
                 if self.config.include_iteration_count and turn_count > 1:
@@ -134,7 +143,9 @@ class PushNotifyHook:
 
         if self.config.debug:
             if success:
-                logger.debug(f"Push notification sent via {self.config.service}: {message}")
+                logger.debug(
+                    f"Push notification sent via {self.config.service}: {message}"
+                )
             else:
                 logger.warning(f"Push notification failed: {error}")
 
@@ -172,15 +183,18 @@ async def mount(coordinator, config: dict | None = None):
     config = config or {}
 
     # Check env var for easy disable
-    env_push = os.environ.get("AMPLIFIER_PUSH_ENABLED", "").lower()
+    env_push = os.environ.get("AMPLIFIER_NOTIFY_PUSH_ENABLED", "").lower()
     env_enabled = env_push not in ("false", "0", "no", "off")
     enabled = config.get("enabled", env_enabled)
 
-    # Get topic from config or env var
-    topic = config.get("topic", "") or os.environ.get("AMPLIFIER_NTFY_TOPIC", "")
-    
-    # Get server from config or env var
-    server = config.get("server", "") or os.environ.get("AMPLIFIER_NTFY_SERVER", "https://ntfy.sh")
+    # SECURITY: Topic MUST come from env var only (stored in keys.env)
+    # Never accept topic from config (settings.yaml) - it's a secret
+    topic = os.environ.get("AMPLIFIER_NTFY_TOPIC", "")
+
+    # Get server from config or env var (server URL is not secret)
+    server = config.get("server", "") or os.environ.get(
+        "AMPLIFIER_NTFY_SERVER", "https://ntfy.sh"
+    )
 
     # Parse tags
     tags = config.get("tags", ["robot"])
@@ -227,7 +241,9 @@ async def mount(coordinator, config: dict | None = None):
             "enabled": push_config.enabled,
             "service": push_config.service,
             "server": push_config.server,
-            "topic": push_config.topic[:4] + "..." if push_config.topic else "(not set)",
+            "topic": push_config.topic[:4] + "..."
+            if push_config.topic
+            else "(not set)",
             "listen_event": push_config.listen_event,
         },
     }
