@@ -814,17 +814,26 @@ class NotifyHooks:
                 self.coordinator, self.config.preview_length
             )
 
+        # Build message with project label on first line, content on second
+        # Format: "Project: <name>\n<preview or status>"
+        project_line = f"Project: {self.subtitle}" if self.subtitle else ""
+        
         if preview:
-            # Use the preview as the main message content
-            message = preview
+            content_line = preview
         elif self.config.show_iteration_count and turn_count > 1:
-            message = f"Ready ({turn_count} iterations)"
+            content_line = f"Ready ({turn_count} iterations)"
         else:
-            message = "Ready for input"
+            content_line = "Ready for input"
 
         # Add status if not success
         if status != "success":
-            message = f"{message} [{status}]"
+            content_line = f"{content_line} [{status}]"
+
+        # Combine into multi-line message
+        if project_line:
+            message = f"{project_line}\n{content_line}"
+        else:
+            message = content_line
 
         # Send the notification
         success, error = send_notification(
