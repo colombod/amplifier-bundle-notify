@@ -18,9 +18,24 @@ This bundle provides notification hooks that fire when the assistant finishes pr
 - **Focus detection**: Optionally suppress when terminal is focused
 - **Configurable thresholds**: Only notify on multi-iteration turns
 
-## Recommended Usage: App-Level Configuration
+## Quick Setup (CLI)
 
-The recommended way to use notifications is via `settings.yaml`, letting the app compose the hooks at runtime:
+The easiest way to configure notifications:
+
+```bash
+# Desktop/terminal notifications
+amplifier notify desktop --enable
+
+# Push notifications via ntfy.sh
+amplifier notify ntfy --enable --topic my-secret-topic
+
+# Check current settings
+amplifier notify status
+```
+
+## Manual Configuration (settings.yaml)
+
+Alternatively, configure directly in `settings.yaml`:
 
 ```yaml
 # ~/.amplifier/settings.yaml
