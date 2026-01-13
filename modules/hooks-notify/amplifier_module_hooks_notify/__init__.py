@@ -332,16 +332,17 @@ def send_terminal_notification(
             osc_9 = wrap_for_screen(osc_9)
 
         # Write to the appropriate output
+        # Only send OSC 777 (the richer format with separate title/body)
+        # OSC 9 is a simpler format - no need to send both as modern terminals
+        # understand OSC 777 and sending both causes duplicate notifications
         if tty_path:
             # Write directly to TTY device
             with open(tty_path, "w") as tty:
                 tty.write(osc_777)
-                tty.write(osc_9)
                 tty.flush()
         else:
             # Use stdout
             sys.stdout.write(osc_777)
-            sys.stdout.write(osc_9)
             sys.stdout.flush()
 
         multiplexer = "tmux" if in_tmux else ("screen" if in_screen else None)
