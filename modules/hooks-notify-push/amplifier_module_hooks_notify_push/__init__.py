@@ -28,6 +28,7 @@ Configuration (settings.yaml - non-secret options only):
     listen_event: str (default: "notify:turn-complete") - Event to listen to
 """
 
+import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
@@ -148,7 +149,10 @@ class PushNotifyHook:
     async def cleanup(self):
         """Clean up resources."""
         if self._session and not self._session.closed:
-            await self._session.close()
+            try:
+                await asyncio.shield(self._session.close())
+            except asyncio.CancelledError:
+                pass  # Swallow cancellation during cleanup
 
 
 async def mount(coordinator, config: dict | None = None):
@@ -227,17 +231,6 @@ async def mount(coordinator, config: dict | None = None):
         name="hooks-notify-push",
     )
 
-    return {
-        "name": "hooks-notify-push",
-        "version": "0.1.0",
-        "description": f"Push notifications via {push_config.service}",
-        "config": {
-            "enabled": push_config.enabled,
-            "service": push_config.service,
-            "server": push_config.server,
-            "topic": push_config.topic[:4] + "..."
-            if push_config.topic
-            else "(not set)",
-            "listen_event": push_config.listen_event,
-        },
-    }
+    # Return cleanup function to properly close the aiohttp session
+    # The hook's cleanup() method closes its lazy-initialized session
+    return hook.cleanup
