@@ -122,7 +122,7 @@ includes:
 | `show_project` | `true` | Include project/directory name |
 | `show_preview` | `true` | Include message preview |
 | `preview_length` | `100` | Max characters for preview |
-| `suppress_if_focused` | `true` | Skip if terminal appears focused |
+| `suppress_if_focused` | `false` | Skip if terminal appears focused |
 | `min_iterations` | `1` | Only notify after N iterations |
 | `show_iteration_count` | `true` | Show iteration count in message |
 | `sound` | `false` | Play sound (macOS desktop only) |

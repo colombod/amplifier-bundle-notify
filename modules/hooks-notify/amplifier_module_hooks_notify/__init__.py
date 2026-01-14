@@ -24,7 +24,7 @@ Configuration:
         - "cwd": Last segment of current working directory
         - "git": Git repository name (falls back to cwd)
         - Any other string: Used as literal subtitle
-    suppress_if_focused: bool (default: True) - Skip notification if terminal appears focused
+    suppress_if_focused: bool (default: False) - Skip notification if terminal appears focused
     min_iterations: int (default: 1) - Minimum loop iterations to trigger
     show_iteration_count: bool (default: True) - Show iteration count in message
     sound: bool (default: False) - Play sound with notification (macOS desktop only)
@@ -72,7 +72,7 @@ class NotifyConfig:
     method: str = "auto"  # "auto", "terminal", "desktop"
     title: str = "Amplifier"  # Notification title
     subtitle: str = "cwd"  # "cwd", "git", or custom string (for project name)
-    suppress_if_focused: bool = True  # Skip if terminal appears focused
+    suppress_if_focused: bool = False  # Skip if terminal appears focused
     min_iterations: int = 1
     show_iteration_count: bool = True
     sound: bool = False
@@ -976,7 +976,7 @@ async def mount(coordinator, config: dict | None = None):
             method: str (default: "auto") - "auto", "terminal", "desktop"
             title: str (default: "Amplifier") - Notification title
             subtitle: str (default: "cwd") - "cwd", "git", or custom string
-            suppress_if_focused: bool (default: True) - Skip if terminal focused
+            suppress_if_focused: bool (default: False) - Skip if terminal focused
             min_iterations: int (default: 1)
             show_iteration_count: bool (default: True)
             sound: bool (default: False)
@@ -1001,7 +1001,7 @@ async def mount(coordinator, config: dict | None = None):
         method=config.get("method", "auto"),
         title=config.get("title", "Amplifier"),
         subtitle=config.get("subtitle", "cwd"),
-        suppress_if_focused=config.get("suppress_if_focused", True),
+        suppress_if_focused=config.get("suppress_if_focused", False),
         min_iterations=config.get("min_iterations", 1),
         show_iteration_count=config.get("show_iteration_count", True),
         sound=config.get("sound", False),
